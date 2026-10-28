@@ -1,0 +1,5 @@
+# PyInstaller spec: builds dist/FrameTweak/FrameTweak.exe (no console window)
+a = Analysis(['main.py'], pathex=['.'], datas=[('assets', 'assets')], excludes=['tkinter'])
+pyz = PYZ(a.pure)
+exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name='FrameTweak', console=False, icon='assets/frametweak.ico')
+coll = COLLECT(exe, a.binaries, a.datas, name='FrameTweak')
