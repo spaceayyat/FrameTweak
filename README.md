@@ -6,8 +6,6 @@
 
 ## Screenshots
 
-> Captured headlessly on a non-Windows machine, so Windows-only fields (edition, GPU, power plan, Game Mode, startup count) correctly read **Unavailable**. On Windows they show real values. Regenerate with `python tools/screenshots.py`.
-
 | Dashboard | Monitoring |
 |---|---|
 | ![Dashboard](docs/screenshots/dashboard.png) | ![Monitoring](docs/screenshots/monitoring.png) |
