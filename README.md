@@ -20,13 +20,13 @@
 
 | Area | What you get |
 |---|---|
-| **Dashboard** | Live CPU/RAM/disk gauges; Windows version, CPU, GPU, RAM, disk, power plan, Game Mode, startup count; recent actions. Unreadable values show "Unavailable". |
+| **Dashboard** | Live CPU/RAM/disk gauges; Windows version, CPU, GPU, RAM, disk, power plan, Game Mode, startup count; recent actions. Unreadable values show "Unavailable". **Export report** saves a plain-text summary (system, tweak status, recent actions) you can attach to a bug report or keep as a before/after record. |
 | **Monitoring** | Live CPU, RAM and disk charts and top memory users. Samples only while the page is visible. |
-| **Gaming** | 10-second measured diagnostic (CPU/RAM/disk, top processes, display resolution and refresh rate, NVIDIA GPU via `nvidia-smi`, sensors when exposed). Findings cite their evidence and avoid definitive "bottleneck" claims. Profiles (3 presets + custom, validated JSON import/export). History with before/after comparison. **No FPS is measured.** |
+| **Gaming** | 10-second measured diagnostic (CPU/RAM/disk, top processes, display resolution and refresh rate, NVIDIA GPU via `nvidia-smi`, sensors when exposed). Findings cite their evidence and avoid definitive "bottleneck" claims. Profiles (4 presets + custom, validated JSON import/export). History with before/after comparison. **No FPS is measured.** |
 | **Startup** | Lists Run-key and Startup-folder entries with status. Enable/disable through `StartupApproved` (what Task Manager uses): backed up, verified, undoable. Nothing is deleted. |
 | **Debloat** | Detects installed Store apps and offers removal of a **curated allow-list only** (23 optional Microsoft apps such as Weather, News, Solitaire, Clipchamp, Copilot). Security, Store, Xbox/gaming and system components are blocked. One confirmation lists exactly what will be removed; each removal is verified. Removal is not auto-reversible (reinstall from the Microsoft Store). |
-| **Tweaks** | Game Mode and the High performance power plan, each with what/why/drawbacks/admin/reversible/current value. |
-| **Cleanup** | User temp files and crash dumps only. Analyze first, then confirm. Skips files modified in the last 24 h and locked files, never follows symlinks, refuses protected folders. Reports measured bytes removed. |
+| **Tweaks** | 9 individually applied, reversible tweaks in four groups, each shown with what/why/drawbacks/admin/reversible/current value and an Applied / Not applied status, plus **Undo all** (one confirmation listing exactly what is restored). **Gaming:** Game Mode, High performance power plan, Game DVR background capture off, Game Bar controller-button/tips off. **Input:** mouse pointer acceleration off, Sticky Keys / Filter Keys pop-ups off (only the shortcut flag is cleared, your other accessibility flags are kept). **Visuals:** transparency effects off. **Privacy:** advertising ID off, Windows suggestions and tips off. All are current-user (HKCU) settings and need no administrator rights. |
+| **Cleanup** | A fixed list of temp and cache folders: user temp files, crash dumps, this user's Windows error reports, and the DirectX / NVIDIA / AMD shader caches (shader caches start **unselected**: they rebuild automatically, but games can stutter on their next launch). Analyze first, then confirm. Scanning and cleaning run in the background so the window stays responsive. Skips files modified in the last 24 h and locked files, never follows symlinks, refuses protected folders. Reports measured bytes removed. |
 | **Logs / Settings** | Local log viewer; persisted monitoring interval and window size. |
 
 ### Safety principles
@@ -61,8 +61,8 @@ No Windows PC? Push to GitHub and run the **build-windows-installer** workflow; 
 ## Architecture
 ```
 main.py                  entry point (start-up errors -> native message box + log)
-src/core/                sysinfo, winproc (the only subprocess launcher), applog, paths
-src/tweaks/              engine.py (backup/apply/verify/rollback/undo) + catalog.py
+src/core/                sysinfo, winproc (the only subprocess launcher), applog, paths, report
+src/tweaks/              engine.py (backup/apply/verify/rollback/undo/undo-all), regtweaks.py (validated HKCU tweaks), catalog.py
 src/startup/             inspect_startup.py, manage.py
 src/debloat/             appx.py (curated allow-list, deny patterns, verified removal)
 src/cleanup/             cleaner.py (allow-listed roots, age gate, symlink-safe)
@@ -79,12 +79,14 @@ tests/  tools/  assets/  installer/  .github/workflows/
 pip install -r requirements-dev.txt
 python -m pytest -q
 ```
-46 tests cover system-info fallbacks, backup/restore, the change engine (including failed writes, failed verification, corrupt backups), startup toggling against a fake registry, debloat classification and refusals, cleanup safety, profile validation/import/export, diagnostics analysis, subprocess hygiene, icon assets, the background worker, window smoke tests, and static checks of the `.bat` scripts. Destructive operations are always mocked; tests never touch real system settings.
+The tests cover system-info fallbacks, backup/restore, the change engine (including failed writes, failed verification, corrupt backups, multi-value rollback, undo-all), every registry tweak against a fake registry (including tampered backups and wrong value types), startup toggling against a fake registry, debloat classification and refusals, cleanup safety and the cleanup categories, the exported report, profile validation/import/export, diagnostics analysis, subprocess hygiene, icon assets, the background worker, window smoke tests, and static checks of the `.bat` scripts. Destructive operations are always mocked; tests never touch real system settings.
+
+The **tests** GitHub Actions workflow runs the suite on a real Windows runner for every push and pull request; the **build-windows-installer** workflow (run it manually from the Actions tab) runs the tests, builds the exe and installer and attaches them as downloads.
 
 ### Verification status
 | | Status |
 |---|---|
-| Unit and headless UI tests | Run: 46 passed (Linux) |
+| Unit tests (logic, engine, tweaks, cleanup, report) | Run: 86 passed (Linux). Two headless Qt smoke tests need PySide6 and were skipped where the latest changes were written, so run `python -m pytest -q` (or the CI workflow) to confirm the UI pages. |
 | Registry, `powercfg`, `Get/Remove-AppxPackage`, display API, `nvidia-smi` | Written, mocked in tests, **not run on Windows** |
 | `.bat` installer/launcher/uninstaller/build scripts | Statically checked only, **not run on Windows** |
 | PyInstaller exe, Inno Setup installer, desktop shortcut, "no console window" behavior | **Not built or run** |
@@ -93,15 +95,15 @@ Safe manual check on Windows: apply Game Mode from Tweaks and undo it, confirmin
 
 ## Known limitations
 - Windows 10/11 only (other versions are flagged unsupported).
-- Only two tweaks so far (Game Mode, High performance plan). Presets are therefore similar.
+- Tweak gains vary and are often small; FrameTweak never measures FPS, so use the before/after diagnostics to check what changed on your PC.
+- The mouse and keyboard tweaks write the current-user settings Windows reads at sign-in, so they usually take effect after you sign out and back in.
 - GPU stats need NVIDIA + `nvidia-smi`; AMD/Intel show Unavailable. CPU temperature is usually not exposed by Windows.
 - No FPS measurement; that needs an external tool and is out of scope.
 - Changing all-users (HKLM) startup entries requires running FrameTweak as administrator.
-- Cleanup scan runs on the UI thread; large temp folders may briefly pause the window.
 - Unsigned installer: SmartScreen may warn.
 
 ## Roadmap
-Privacy and visual-effects tweaks; Edge startup/background behavior tweaks; AMD/Intel GPU sensors; light theme; code signing; optional external FPS-tool integration (opt-in).
+More privacy and visual-effects tweaks; Edge startup/background behavior tweaks; a one-click restore point before debloating (needs administrator); AMD/Intel GPU sensors; light theme; code signing; optional external FPS-tool integration (opt-in).
 
 ## Disclaimer
 FrameTweak changes Windows settings and can uninstall apps. It is provided as-is, without warranty. Create a restore point and read each confirmation. It does not guarantee any FPS improvement.

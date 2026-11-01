@@ -1,23 +1,35 @@
 """Safe temp cleanup: allow-listed roots only, never follows symlinks, skips recent/locked files."""
 import os, tempfile, time
 from dataclasses import dataclass, field
-from typing import Iterable, List
+from typing import Iterable, List, Optional
 
 PROTECTED_NAMES = {"downloads", "documents", "desktop", "pictures", "videos", "music", "onedrive"}
 
 @dataclass
 class Category:
     id: str; name: str; path: str
+    default_selected: bool = True  # False for caches whose removal has a visible cost (they rebuild on next use)
+    note: str = ""
 
 @dataclass
 class CleanResult:
     bytes_removed: int = 0; files_removed: int = 0; skipped: int = 0
     errors: List[str] = field(default_factory=list)
 
-def categories() -> List[Category]:
-    cats = [Category("user_temp", "User temporary files", tempfile.gettempdir())]
-    local = os.environ.get("LOCALAPPDATA")
-    if local: cats.append(Category("crash_dumps", "Application crash dumps", os.path.join(local, "CrashDumps")))
+REBUILD = "Rebuilt automatically; the first launch of each game may stutter or load slowly while shaders recompile."
+
+def categories(local_appdata: Optional[str] = None, temp_dir: Optional[str] = None) -> List[Category]:
+    """Fixed, allow-listed cleanup locations that exist on this PC. Paths can be injected for tests."""
+    local = local_appdata if local_appdata is not None else os.environ.get("LOCALAPPDATA")
+    cats = [Category("user_temp", "User temporary files", temp_dir or tempfile.gettempdir())]
+    if local:
+        j = lambda *p: os.path.join(local, *p)
+        cats += [Category("crash_dumps", "Application crash dumps", j("CrashDumps")),
+                 Category("wer_reports", "Windows error reports (this user)", j("Microsoft", "Windows", "WER")),
+                 Category("dx_shader_cache", "DirectX shader cache (rebuilds on next game launch)", j("D3DSCache"), False, REBUILD),
+                 Category("nv_dx_cache", "NVIDIA DirectX shader cache (rebuilds on next game launch)", j("NVIDIA", "DXCache"), False, REBUILD),
+                 Category("nv_gl_cache", "NVIDIA OpenGL shader cache (rebuilds on next game launch)", j("NVIDIA", "GLCache"), False, REBUILD),
+                 Category("amd_dx_cache", "AMD shader cache (rebuilds on next game launch)", j("AMD", "DxCache"), False, REBUILD)]
     return [c for c in cats if os.path.isdir(c.path)]
 
 def validate_root(path: str, allowed: Iterable[str]) -> str:

@@ -1,0 +1,47 @@
+name: build-windows-installer
+
+# Run this from the Actions tab ("Run workflow") if you have no Windows PC to build on.
+# It runs the tests, builds FrameTweak.exe with PyInstaller, builds the Inno Setup installer,
+# and attaches both as downloadable artifacts.
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - name: Install dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
+      - name: Run tests
+        run: python -m pytest -q
+        env:
+          QT_QPA_PLATFORM: offscreen
+      - name: Build the app with PyInstaller
+        run: python -m PyInstaller --noconfirm --clean FrameTweak.spec
+      - name: Check the exe was built
+        shell: pwsh
+        run: |
+          if (-not (Test-Path dist\FrameTweak\FrameTweak.exe)) { throw "dist\FrameTweak\FrameTweak.exe was not built" }
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+      - name: Build the installer
+        shell: pwsh
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer\FrameTweak.iss
+          if (-not (Test-Path dist-installer\FrameTweak-Setup.exe)) { throw "dist-installer\FrameTweak-Setup.exe was not built" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FrameTweak-Setup
+          path: dist-installer/FrameTweak-Setup.exe
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FrameTweak-portable
+          path: dist/FrameTweak
+          if-no-files-found: error

@@ -1,7 +1,7 @@
 ; Inno Setup 6 script. Installs per-user by default (no admin needed); user may choose all-users at the prompt.
 [Setup]
 AppName=FrameTweak
-AppVersion=0.3.0
+AppVersion=0.4.0
 AppPublisher=FrameTweak
 DefaultDirName={autopf}\FrameTweak
 DefaultGroupName=FrameTweak
