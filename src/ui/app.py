@@ -3,8 +3,9 @@ from PySide6.QtCore import Qt, QTimer, QSettings, QPointF, QRectF, QSize, QPrope
 from PySide6.QtGui import QPainter, QColor, QPen, QPolygonF, QIcon, QPixmap, QLinearGradient, QBrush, QPainterPath, QFont
 from PySide6.QtWidgets import (QSizePolicy, QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QListWidget, QListWidgetItem,
                                QStackedWidget, QLabel, QPushButton, QFrame, QGridLayout, QPlainTextEdit, QComboBox, QGraphicsOpacityEffect, QGraphicsDropShadowEffect)
-from src.core import sysinfo
+from src.core import sysinfo, report
 from src.core.applog import get_logger, data_dir, log_path
+from src.tweaks.catalog import catalog
 from src.core.paths import resource_path
 from src.monitoring.live import LiveMonitor
 from src.startup.inspect_startup import read_startup_entries
@@ -116,7 +117,7 @@ class Window(QMainWindow):
     NAV = ["Dashboard", "Monitoring", "Startup", "Gaming", "Debloat", "Tweaks", "Cleanup", "Logs", "Settings"]
     def __init__(self):
         super().__init__(); self.setWindowTitle("FrameTweak"); self.setWindowIcon(QIcon(resource_path("assets/frametweak.ico")))
-        self.log = get_logger(); self.mon = LiveMonitor(); self.cfg = QSettings("FrameTweak", "FrameTweak"); self.resize(1120, 700)
+        self.log = get_logger(); self.mon = LiveMonitor(); self.cfg = QSettings("FrameTweak", "FrameTweak"); self.resize(1120, 700); self._snap = None  # last analysis, used by Export report
         g = self.cfg.value("geometry")
         if g: self.restoreGeometry(g)
         root = QWidget(); self.setCentralWidget(root); v = QVBoxLayout(root); v.setContentsMargins(0, 0, 0, 0); v.setSpacing(0); v.addWidget(self._header()); gl = QFrame(); gl.setObjectName("glow"); gl.setFixedHeight(2); v.addWidget(gl)
@@ -151,15 +152,24 @@ class Window(QMainWindow):
             f, v = card(k, "…"); self.cards[k] = v; grid.addWidget(f, i // 2, i % 2)
         self.warn = QLabel(""); self.warn.setObjectName("dim"); self.warn.setWordWrap(True); l.addWidget(self.warn)
         self.recent = QLabel(""); self.recent.setObjectName("dim"); self.recent.setWordWrap(True); l.addWidget(self.recent)
-        self.abtn = QPushButton("Analyze PC"); self.abtn.setProperty("primary", True); self.abtn.clicked.connect(self.analyze); self.abtn.setFixedWidth(140); l.addWidget(self.abtn); l.addStretch()
+        self.abtn = QPushButton("Analyze PC"); self.abtn.setProperty("primary", True); self.abtn.clicked.connect(self.analyze); self.abtn.setFixedWidth(140)
+        self.rbtn = QPushButton("Export report"); self.rbtn.setToolTip("Save a plain-text summary of this PC, your tweak status and recent actions"); self.rbtn.clicked.connect(self.export_report)
+        br = QHBoxLayout(); br.addWidget(self.abtn); br.addWidget(self.rbtn); br.addStretch(); l.addLayout(br); l.addStretch()
         self.analyze(); return w
+
+    def export_report(self):
+        if self._snap is None: self.statusBar().showMessage("Run Analyze PC first, then export the report.", 6000); return
+        acts = [x for x in self._log_lines() if re.search(r"tweak|startup|debloat|cleanup", x)][-20:]
+        try: path = report.save_report(report.build_report(self._snap, report.tweak_status(catalog()), acts), data_dir())
+        except OSError as e: self.statusBar().showMessage(f"Could not save the report: {e}", 8000); self.log.error("report failed: %s", e); return
+        self.statusBar().showMessage(f"Report saved to {path}", 12000); self.log.info("Report exported")
 
     def analyze(self):
         self.abtn.setEnabled(False); self.statusBar().showMessage("Analyzing…")
         run_bg(lambda: (sysinfo.collect(), len(read_startup_entries())), self._show, lambda m: (self.abtn.setEnabled(True), self.statusBar().showMessage(f"Analysis failed: {m}"), self.log.error("analysis failed: %s", m)))
 
     def _show(self, res):
-        s, n = res; u = lambda x: x if x not in (None, "") else "Unavailable"; c = self.cards
+        s, n = res; self._snap = s; u = lambda x: x if x not in (None, "") else "Unavailable"; c = self.cards
         c["Windows"].setText(u(s.windows) + ("" if s.supported or not s.windows else "  (unsupported version)"))
         c["CPU"].setText(f"{u(s.cpu)} ({s.cpu_cores} threads)" if s.cpu_cores else u(s.cpu)); c["GPU"].setText(u(s.gpu))
         c["RAM"].setText(f"{sysinfo.fmt_bytes(s.ram_available)} free of {sysinfo.fmt_bytes(s.ram_total)}")
