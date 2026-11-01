@@ -1,10 +1,11 @@
-import json, pytest
+import json, sys, pytest
 from src.gaming import diagnostics as dg
 from src.profiles.store import ProfileStore, validate_profile, compare_snapshots
 
 def test_collect_real_but_fast(monkeypatch):
     s = dg.collect(seconds=2, interval=1.0, sleep=lambda x: None)
-    assert s["seconds"] == 2 and s["ram_avg"] is not None and 0 <= s["cpu_avg"] <= 100 and s["display"] is None
+    assert s["seconds"] == 2 and s["ram_avg"] is not None and 0 <= s["cpu_avg"] <= 100
+    assert sys.platform == "win32" or s["display"] is None  # the display is only read on Windows
 
 def test_analyze_cites_evidence_and_hedges():
     f = dg.analyze({"seconds": 10, "ram_avg": 92.0, "ram_max": 95.0, "cpu_avg": 30.0, "cpu_max": 50.0, "disk_avg": 1.0, "disk_max": 2.0,

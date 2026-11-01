@@ -1,0 +1,10 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Created by Install-FrameTweak.bat / Build-FrameTweak.bat
+.venv/
+build/
+dist/
+dist-installer/

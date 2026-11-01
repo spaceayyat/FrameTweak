@@ -2,11 +2,16 @@
 import json, os, re, tempfile
 from typing import List
 
-KNOWN = {"game_mode": "Enable Windows Game Mode", "power_high": "Use the High performance power plan"}
+# Tweaks a profile may contain (id -> name; names must match the Tweaks catalog, a test checks that).
+KNOWN = {"game_mode": "Enable Windows Game Mode", "power_high": "Use the High performance power plan",
+         "game_dvr_off": "Turn off Game DVR background capture", "gamebar_quiet": "Stop the controller button and tips from opening Game Bar",
+         "mouse_accel_off": "Turn off mouse pointer acceleration", "sticky_keys_prompts_off": "Stop the Sticky Keys and Filter Keys pop-ups"}
 PRESETS = {
     "Balanced": {"tweaks": ["game_mode"], "notes": "Game Mode only; leaves your power plan alone."},
     "Gaming": {"tweaks": ["game_mode", "power_high"], "notes": "Game Mode and the High performance power plan. Uses more power."},
     "Low Background Activity": {"tweaks": ["game_mode"], "notes": "Game Mode, then use the Startup page and close background apps yourself. FrameTweak never auto-closes processes."},
+    "Competitive": {"tweaks": ["game_mode", "power_high", "game_dvr_off", "gamebar_quiet", "mouse_accel_off", "sticky_keys_prompts_off"],
+                    "notes": "For fast-paced games: less Game Bar activity, no pointer acceleration and no Sticky Keys pop-ups, on top of Game Mode and High performance. Uses more power; the mouse and keyboard changes need a sign-out to take effect."},
 }
 EXE = re.compile(r"^[A-Za-z0-9._ -]{1,64}\.exe$")
 
